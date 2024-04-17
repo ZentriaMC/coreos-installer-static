@@ -1,0 +1,26 @@
+---
+name: "Build"
+
+on:
+  workflow_dispatch: {}
+
+env:
+  RUST_VERSION: "1.77.2"
+  COREOS_INSTALLER_VERSION: "0.21.0"
+
+jobs:
+  build:
+    runs-on: "ubuntu-latest"
+    container:
+      image: "rust:${{ env.RUST_VERSION }}-alpine"
+    steps:
+      - name: "Install build-time dependencies"
+        run: |
+          apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconf zstd-dev zstd-static
+
+      - name: "Build coreos-installer"
+        run: |
+          set -e -x
+          cargo install --target-dir . "coreos-installer@${{ env.COREOS_INSTALLER_VERSION }}"
+
+          test -f /usr/local/cargo/bin/coreos-installer
