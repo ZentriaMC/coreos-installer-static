@@ -1,0 +1,76 @@
+---
+name: "Build"
+
+on:
+  workflow_dispatch:
+    inputs:
+      rust_version:
+        type: "string"
+        description: "Rust version"
+        required: true
+        default: "1.77.2"
+
+      coreos_installer_version:
+        type: "string"
+        description: "CoreOS Installer version"
+        required: true
+        default: "0.21.0"
+
+jobs:
+  build:
+    name: "Build"
+    runs-on: "ubuntu-latest"
+    strategy:
+      matrix:
+        target:
+          - "x86_64-linux"
+          # TODO: aarch64 runners
+          #- "aarch64-linux"
+    container:
+      image: "rust:${{ inputs.rust_version }}-alpine"
+    steps:
+      - name: "Install build-time dependencies"
+        run: |
+          apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconf zstd-dev zstd-static
+
+      - name: "Build coreos-installer"
+        run: |
+          set -e -x
+          cargo install --target-dir . "coreos-installer@${{ inputs.coreos_installer_version }}"
+
+          test -f /usr/local/cargo/bin/coreos-installer
+          mv -v /usr/local/cargo/bin/coreos-installer "/usr/local/cargo/bin/coreos-installer-${{ matrix.target }}"
+
+      - name: "Upload artifact"
+        uses: "actions/upload-artifact@v4"
+        with:
+          name: "coreos-installer"
+          path: "/usr/local/cargo/bin/coreos-installer-${{ matrix.target }}"
+          retention-days: 1
+
+  publish:
+    name: "Publish"
+    needs: "build"
+    runs-on: "ubuntu-latest"
+    if: "${{ github.event_name == 'workflow_dispatch' }}"
+    steps:
+      - id: "download-artifact"
+        name: "Download binary from workspace"
+        uses: "actions/download-artifact@v4"
+        with:
+          name: "coreos-installer"
+          path: "artifacts"
+
+      - id: "publish"
+        name: "Publish Github release"
+        uses: "softprops/action-gh-release@v1"
+        with:
+          body: |
+            For changes, see here: https://github.com/coreos/coreos-installer/releases/releases/tag/v${{ inputs.coreos_installer_version }}
+          files: |
+            artifacts/coreos-installer*
+          tag_name: "${{ inputs.coreos_installer_version }}"
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          generate_release_notes: true
