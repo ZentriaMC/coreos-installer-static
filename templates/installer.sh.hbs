@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{
+    base_url="https://github.com/ZentriaMC/coreos-installer-static"
+    version="{{ version }}"
+
+    asset_name=""
+    sha256=""
+
+    os_arch="$(uname -m)-$(uname -s)"
+    os_arch="${os_arch,,}" # lowercase
+    case "${os_arch}" in
+{{#each assets}}
+        {{ os }})
+            asset_name="{{ name }}"
+            sha256="{{ sha256 }}"
+            ;;
+{{/each}}
+        *)
+            echo >&2 "Unsupported OS & arch combination: ${os_arch}"
+            exit 1
+            ;;
+    esac
+
+
+    download_url="${base_url}/releases/download/${version}/${asset_name}"
+    tmpdir_name="coreos-installer-${os_arch}-${version}"
+
+    download_path="${TMPDIR:-/tmp}/${tmpdir_name}"
+    target_path="${download_path}/${asset_name}"
+
+    if ! [ -x "${target_path}" ]; then
+        target_path_tmp="${download_path}/.${asset_name}.${RANDOM}"
+        mkdir -p "${download_path}"
+
+        curl --fail -L -o "${target_path_tmp}" "${download_url}"
+        chmod +x "${target_path_tmp}"
+
+        if ! (sha256sum "${target_path_tmp}" | grep -q -F "${sha256}"); then
+            echo >&2 "sha256 verification failed"
+            exit 1
+        fi
+
+        mv "${target_path_tmp}" "${target_path}"
+    fi
+
+    exec "${target_path}" "${@}"
+}
+
+# vim: et:sw=4:sts=4

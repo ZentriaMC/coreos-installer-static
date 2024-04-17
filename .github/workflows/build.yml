@@ -19,33 +19,36 @@ on:
 jobs:
   build:
     name: "Build"
-    runs-on: "ubuntu-latest"
     strategy:
       matrix:
         target:
-          - "x86_64-linux"
-          # TODO: aarch64 runners
-          #- "aarch64-linux"
-    container:
-      image: "rust:${{ inputs.rust_version }}-alpine"
+          - os: "x86_64-linux"
+            labels: "ubuntu-latest"
+          - os: "aarch64-linux"
+            labels: "arc-runner-set"
+    runs-on: "${{ matrix.target.labels }}"
     steps:
-      - name: "Install build-time dependencies"
-        run: |
-          apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconf zstd-dev zstd-static
-
       - name: "Build coreos-installer"
-        run: |
-          set -e -x
-          cargo install --target-dir . "coreos-installer@${{ inputs.coreos_installer_version }}"
+        uses: "addnab/docker-run-action@v3"
+        with:
+          image: "rust:${{ inputs.rust_version }}-alpine"
+          options: |
+            -v ${{ github.workspace }}:/work
+          run: |
+            set -e -x
 
-          test -f /usr/local/cargo/bin/coreos-installer
-          mv -v /usr/local/cargo/bin/coreos-installer "/usr/local/cargo/bin/coreos-installer-${{ matrix.target }}"
+            apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconf zstd-dev zstd-static
+
+            cargo install --target-dir . "coreos-installer@${{ inputs.coreos_installer_version }}"
+
+            test -f /usr/local/cargo/bin/coreos-installer
+            cp -v /usr/local/cargo/bin/coreos-installer "/work/coreos-installer-${{ matrix.target.os }}"
 
       - name: "Upload artifact"
         uses: "actions/upload-artifact@v4"
         with:
-          name: "coreos-installer"
-          path: "/usr/local/cargo/bin/coreos-installer-${{ matrix.target }}"
+          name: "coreos-installer-${{ matrix.target.os }}"
+          path: "coreos-installer-${{ matrix.target.os }}"
           retention-days: 1
 
   publish:
@@ -54,12 +57,45 @@ jobs:
     runs-on: "ubuntu-latest"
     if: "${{ github.event_name == 'workflow_dispatch' }}"
     steps:
+      - id: "checkout"
+        name: "Check out sources"
+        uses: "actions/checkout@v4"
+
+      - id: "setup-deno"
+        name: "Setup Deno"
+        uses: "denoland/setup-deno@v1"
+        with:
+          deno-version: "1.42.4"
+
       - id: "download-artifact"
         name: "Download binary from workspace"
         uses: "actions/download-artifact@v4"
         with:
-          name: "coreos-installer"
+          pattern: "coreos-installer-*"
           path: "artifacts"
+          merge-multiple: true
+
+      - id: "generate-metadata"
+        name: "Generate build metadata"
+        run: |
+          set -euo pipefail
+
+          mkdir -p metadata
+
+          (cd artifacts && sha256sum *) >> metadata/SHA256SUMS
+          # Produce { name, os, sha256 } from every SHA256SUMS line
+          jq -ecr -s -R '[split("\n")[] | select(. | length > 0) | split("\\s+";"") | { name: .[1], os: (.[1] | sub("coreos-installer-"; ""; "")), sha256: .[0] }]' < metadata/SHA256SUMS \
+            | jq --arg version "${{ inputs.coreos_installer_version }}" '{ version: $version, assets: . }' > metadata/assets.json
+
+      - id: "generate-install-script"
+        name: "Generate install script"
+        run: |
+          set -euo pipefail
+
+          mkdir -p scripts
+          ./hack/gen_installer.ts metadata/assets.json
+
+          (cd scripts && sha256sum *) >> metadata/SHA256SUMS
 
       - id: "publish"
         name: "Publish Github release"
@@ -69,8 +105,11 @@ jobs:
             For changes, see here: https://github.com/coreos/coreos-installer/releases/releases/tag/v${{ inputs.coreos_installer_version }}
           files: |
             artifacts/coreos-installer*
+            scripts/installer.sh
+            metadata/assets.json
+            metadata/SHA256SUMS
           tag_name: "${{ inputs.coreos_installer_version }}"
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
-          generate_release_notes: true
+          generate_release_notes: false
