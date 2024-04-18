@@ -5,6 +5,13 @@ set -euo pipefail
     base_url="https://github.com/ZentriaMC/coreos-installer-static"
     version="{{ version }}"
 
+    gzip=""
+    if command -v pigz &>/dev/null; then
+        gzip="pigz"
+    elif command -v gzip &>/dev/null; then
+        gzip="gzip"
+    fi
+
     asset_name=""
     sha256=""
 
@@ -25,6 +32,9 @@ set -euo pipefail
 
 
     download_url="${base_url}/releases/download/${version}/${asset_name}"
+    if [ -n "${gzip}" ]; then
+        download_url="${download_url}.gz"
+    fi
     tmpdir_name="coreos-installer-${os_arch}-${version}"
 
     download_path="${TMPDIR:-/tmp}/${tmpdir_name}"
@@ -34,7 +44,13 @@ set -euo pipefail
         target_path_tmp="${download_path}/.${asset_name}.${RANDOM}"
         mkdir -p "${download_path}"
 
-        curl --fail -L -o "${target_path_tmp}" "${download_url}"
+        if [ -n "${gzip}" ]; then
+            curl --fail -L -o "${target_path_tmp}.gz" "${download_url}"
+            "${gzip}" -d < "${target_path_tmp}.gz" > "${target_path_tmp}"
+            rm "${target_path_tmp}.gz"
+        else
+            curl --fail -L -o "${target_path_tmp}" "${download_url}"
+        fi
         chmod +x "${target_path_tmp}"
 
         if ! (sha256sum "${target_path_tmp}" | grep -q -F "${sha256}"); then
