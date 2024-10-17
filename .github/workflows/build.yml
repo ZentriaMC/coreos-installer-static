@@ -109,7 +109,7 @@ jobs:
         uses: "softprops/action-gh-release@v1"
         with:
           body: |
-            For changes, see here: https://github.com/coreos/coreos-installer/releases/releases/tag/v${{ inputs.coreos_installer_version }}
+            For changes, see here: https://github.com/coreos/coreos-installer/releases/tag/v${{ inputs.coreos_installer_version }}
           files: |
             artifacts/coreos-installer*
             scripts/installer.sh
