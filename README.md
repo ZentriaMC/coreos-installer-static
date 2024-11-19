@@ -40,7 +40,7 @@ resource "hcloud_server" "node" {
   provisioner "remote-exec" {
     inline = [
       "curl -L -s ${local.coreos_installer_url} | bash -s - install --platform=hetzner --ignition-file=/root/node.ign /dev/sda",
-      "reboot",
+      "systemd-run --no-block --unit=postinstall-reboot.service /bin/sh -c 'sleep 2 && reboot'",
     ]
   }
 }
