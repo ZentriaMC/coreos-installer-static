@@ -8,13 +8,13 @@ on:
         type: "string"
         description: "Rust version"
         required: true
-        default: "1.82.0"
+        default: "1.83.0"
 
       coreos_installer_version:
         type: "string"
         description: "CoreOS Installer version"
         required: true
-        default: "0.21.0"
+        default: "0.22.1"
 
 jobs:
   build:
@@ -28,6 +28,29 @@ jobs:
             labels: "aarch64-k8s-arc"
     runs-on: "${{ matrix.target.labels }}"
     steps:
+      - name: "Download & prepare sources"
+        run: |
+          set -euo pipefail
+
+          mkdir -p coreos-installer vendor
+
+          curl -Lfs -o crate.tar.gz https://github.com/coreos/coreos-installer/archive/refs/tags/v${{ inputs.coreos_installer_version }}.tar.gz
+          curl -Lfs -o vendor.tar.gz https://github.com/coreos/coreos-installer/releases/download/v${{ inputs.coreos_installer_version }}/coreos-installer-${{ inputs.coreos_installer_version }}-vendor.tar.gz
+
+          sha256sum crate.tar.gz vendor.tar.gz
+
+          tar -C coreos-installer --strip-components=1 -xzf crate.tar.gz
+          tar -C vendor --transform 's|^\./vendor/||' --transform 's|^vendor/||' -xzf vendor.tar.gz
+
+          # Set up Cargo config
+          install -D -m 644 /dev/stdin coreos-installer/.cargo/config.toml <<EOF
+          [source.crates-io]
+          replace-with = "vendored-sources"
+
+          [source.vendored-sources]
+          directory = "/work/vendor"
+          EOF
+
       - name: "Build coreos-installer"
         uses: "addnab/docker-run-action@v3"
         with:
@@ -39,16 +62,18 @@ jobs:
 
             apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconf zstd-dev zstd-static
 
-            cargo install --target-dir . "coreos-installer@${{ inputs.coreos_installer_version }}"
+            cd /work/coreos-installer
+            cargo build --frozen --locked --offline --release
 
-            test -f /usr/local/cargo/bin/coreos-installer
-            cp -v /usr/local/cargo/bin/coreos-installer "/work/coreos-installer-${{ matrix.target.os }}"
+            test -f target/release/coreos-installer
+            mkdir -p /work/output
+            cp -v target/release/coreos-installer "/work/output/coreos-installer-${{ matrix.target.os }}"
 
       - name: "Upload artifact"
         uses: "actions/upload-artifact@v4"
         with:
           name: "coreos-installer-${{ matrix.target.os }}"
-          path: "coreos-installer-${{ matrix.target.os }}"
+          path: "output/coreos-installer-${{ matrix.target.os }}"
           retention-days: 1
 
   publish:
