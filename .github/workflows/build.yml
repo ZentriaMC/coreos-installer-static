@@ -25,7 +25,7 @@ jobs:
           - os: "x86_64-linux"
             labels: "ubuntu-latest"
           - os: "aarch64-linux"
-            labels: "arc-runner-set"
+            labels: "aarch64-k8s-arc"
     runs-on: "${{ matrix.target.labels }}"
     steps:
       - name: "Build coreos-installer"
