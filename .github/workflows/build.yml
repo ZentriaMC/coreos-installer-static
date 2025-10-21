@@ -25,7 +25,7 @@ jobs:
           - os: "x86_64-linux"
             labels: "ubuntu-latest"
           - os: "aarch64-linux"
-            labels: "aarch64-k8s-arc"
+            labels: "ubuntu-24.04-arm"
     runs-on: "${{ matrix.target.labels }}"
     steps:
       - name: "Download & prepare sources"
