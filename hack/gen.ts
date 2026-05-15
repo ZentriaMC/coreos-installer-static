@@ -59,7 +59,7 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 
 async function gzip(path: string): Promise<void> {
   const { code, stderr } = await new Deno.Command("gzip", {
-    args: ["-kf", path],
+    args: ["-nkf", path],
   }).output();
   if (code !== 0) {
     throw new Error(
