@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-{
+_main () {
     base_url="https://github.com/ZentriaMC/coreos-installer-static"
     version="{{ version }}"
 
@@ -63,5 +63,7 @@ set -euo pipefail
 
     exec "${target_path}" "${@}"
 }
+
+_main
 
 # vim: et:sw=4:sts=4
