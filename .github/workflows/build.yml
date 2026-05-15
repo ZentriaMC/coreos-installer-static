@@ -70,7 +70,7 @@ jobs:
             cp -v target/release/coreos-installer "/work/output/coreos-installer-${{ matrix.target.os }}"
 
       - name: "Upload artifact"
-        uses: "actions/upload-artifact@v4"
+        uses: "actions/upload-artifact@v7"
         with:
           name: "coreos-installer-${{ matrix.target.os }}"
           path: "output/coreos-installer-${{ matrix.target.os }}"
@@ -82,13 +82,14 @@ jobs:
     runs-on: "ubuntu-latest"
     if: "${{ github.event_name == 'workflow_dispatch' }}"
     permissions:
+      artifact-metadata: "write"
       attestations: "write"
       contents: "write"
       id-token: "write"
     steps:
       - id: "checkout"
         name: "Check out sources"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v6"
 
       - id: "setup-deno"
         name: "Setup Deno"
@@ -98,7 +99,7 @@ jobs:
 
       - id: "download-artifact"
         name: "Download binary from workspace"
-        uses: "actions/download-artifact@v4"
+        uses: "actions/download-artifact@v8"
         with:
           pattern: "coreos-installer-*"
           path: "artifacts"
@@ -110,7 +111,7 @@ jobs:
 
       - id: "publish"
         name: "Publish Github release"
-        uses: "softprops/action-gh-release@v2"
+        uses: "softprops/action-gh-release@v3"
         with:
           body: |
             For changes, see here: https://github.com/coreos/coreos-installer/releases/tag/v${{ inputs.coreos_installer_version }}
@@ -128,7 +129,7 @@ jobs:
 
       - id: "attest"
         name: "Attest"
-        uses: "actions/attest-build-provenance@v1"
+        uses: "actions/attest@v4"
         with:
           subject-path: |
             artifacts/coreos-installer*
