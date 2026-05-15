@@ -104,30 +104,9 @@ jobs:
           path: "artifacts"
           merge-multiple: true
 
-      - id: "generate-metadata"
-        name: "Generate build metadata"
-        run: |
-          set -euo pipefail
-
-          mkdir -p metadata
-
-          (cd artifacts && sha256sum *) | grep -F -v ".gz" >> metadata/SHA256SUMS
-          # Produce { name, os, sha256 } from every SHA256SUMS line
-          jq -ecr -s -R '[split("\n")[] | select(. | length > 0) | split("\\s+";"") | { name: .[1], os: (.[1] | sub("coreos-installer-"; ""; "")), sha256: .[0] }]' < metadata/SHA256SUMS \
-            | jq --arg version "${{ inputs.coreos_installer_version }}" '{ version: $version, assets: . }' > metadata/assets.json
-
-          gzip -k artifacts/coreos-installer*
-          (cd artifacts && sha256sum *.gz) >> metadata/SHA256SUMS
-
-      - id: "generate-install-script"
-        name: "Generate install script"
-        run: |
-          set -euo pipefail
-
-          mkdir -p scripts
-          ./hack/gen_installer.ts metadata/assets.json
-
-          (cd scripts && sha256sum *) >> metadata/SHA256SUMS
+      - id: "generate"
+        name: "Generate release artifacts"
+        run: "./hack/gen.ts '${{ inputs.coreos_installer_version }}'"
 
       - id: "publish"
         name: "Publish Github release"
@@ -138,6 +117,7 @@ jobs:
           files: |
             artifacts/coreos-installer*
             scripts/installer.sh
+            scripts/coreos-installer
             metadata/assets.json
             metadata/SHA256SUMS
           tag_name: "${{ inputs.coreos_installer_version }}"
@@ -153,5 +133,6 @@ jobs:
           subject-path: |
             artifacts/coreos-installer*
             scripts/installer.sh
+            scripts/coreos-installer
             metadata/assets.json
             metadata/SHA256SUMS

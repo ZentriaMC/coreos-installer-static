@@ -13,6 +13,18 @@ version="0.21.0"
 bash <(curl -s -L https://github.com/ZentriaMC/coreos-installer-static/releases/download/${version}/installer.sh) install
 ```
 
+### [dotslash][dotslash]
+
+Since release 0.26.0 a [dotslash][dotslash] file is also included. Drop it into a repository
+to pin a specific version and have it fetched lazily on first invocation:
+
+```bash
+version="0.26.0"
+curl -L -o coreos-installer "https://github.com/ZentriaMC/coreos-installer-static/releases/download/${version}/coreos-installer"
+chmod +x coreos-installer
+./coreos-installer install
+```
+
 ### Terraform
 
 ```terraform
@@ -48,3 +60,4 @@ resource "hcloud_server" "node" {
 
 
 [coreos-installer]: https://coreos.github.io/coreos-installer/
+[dotslash]: https://dotslash-cli.com/
