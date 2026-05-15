@@ -92,9 +92,9 @@ jobs:
 
       - id: "setup-deno"
         name: "Setup Deno"
-        uses: "denoland/setup-deno@v1"
+        uses: "denoland/setup-deno@v2"
         with:
-          deno-version: "1.42.4"
+          deno-version: "2.7.14"
 
       - id: "download-artifact"
         name: "Download binary from workspace"
